@@ -1,0 +1,16 @@
+[build]
+  # Build command
+  command = "npm run build"
+  
+  # Directory to publish (relative to root)
+  publish = "packages/frontend/dist"
+
+[build.environment]
+  # Node version
+  NODE_VERSION = "18"
+
+# Redirect rules for SPA
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

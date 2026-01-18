@@ -1,0 +1,62 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: itp-postgres
+    environment:
+      POSTGRES_DB: industry_training_platform
+      POSTGRES_USER: itp_user
+      POSTGRES_PASSWORD: itp_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./packages/backend/prisma/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - itp-network
+
+  mongodb:
+    image: mongo:7.0
+    container_name: itp-mongodb
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: itp_user
+      MONGO_INITDB_ROOT_PASSWORD: itp_password
+      MONGO_INITDB_DATABASE: industry_training_platform
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+      - ./packages/backend/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+    networks:
+      - itp-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: itp-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes --requirepass itp_redis_password
+    networks:
+      - itp-network
+
+  adminer:
+    image: adminer
+    container_name: itp-adminer
+    ports:
+      - "8080:8080"
+    networks:
+      - itp-network
+    depends_on:
+      - postgres
+
+volumes:
+  postgres_data:
+  mongodb_data:
+  redis_data:
+
+networks:
+  itp-network:
+    driver: bridge

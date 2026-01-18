@@ -1,0 +1,465 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                String   @id @default(cuid())
+  email             String   @unique
+  passwordHash      String
+  firstName         String?
+  lastName          String?
+  avatar            String?
+  bio               String?
+  currentRole       String?
+  experienceLevel   ExperienceLevel @default(BEGINNER)
+  location          String?
+  linkedinProfile   String?
+  portfolioUrl      String?
+  subscriptionStatus SubscriptionStatus @default(FREE)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  lastActive        DateTime @default(now())
+
+  // Relations
+  enrollments       Enrollment[]
+  assessmentResults AssessmentResult[]
+  certificates      Certificate[]
+  userSkills        UserSkill[]
+  learningHistory   LearningHistory[]
+  jobApplications   JobApplication[]
+
+  @@map("users")
+}
+
+model Course {
+  id                String   @id @default(cuid())
+  title             String
+  slug              String   @unique
+  description       String
+  longDescription   String?
+  instructorId      String
+  difficulty        DifficultyLevel @default(BEGINNER)
+  estimatedHours    Int
+  language          String @default("en")
+  pricing           Json // Store pricing information as JSON
+  enrollmentCount   Int @default(0)
+  completionRate    Float @default(0.0)
+  averageRating     Float @default(0.0)
+  status            CourseStatus @default(DRAFT)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  lastUpdated       DateTime @default(now())
+
+  // Relations
+  modules           Module[]
+  enrollments       Enrollment[]
+  assessments       Assessment[]
+  certificates      Certificate[]
+  courseSkills      CourseSkill[]
+  reviews           CourseReview[]
+
+  @@map("courses")
+}
+
+model Module {
+  id                String   @id @default(cuid())
+  courseId          String
+  title             String
+  description       String?
+  orderIndex        Int
+  estimatedDuration Int // in minutes
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relations
+  course            Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  lessons           Lesson[]
+  moduleProgress    ModuleProgress[]
+
+  @@map("modules")
+}
+
+model Lesson {
+  id                String   @id @default(cuid())
+  moduleId          String
+  title             String
+  type              LessonType @default(VIDEO)
+  content           Json // Store lesson content as JSON
+  duration          Int // in minutes
+  orderIndex        Int
+  isOptional        Boolean @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relations
+  module            Module @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  lessonProgress    LessonProgress[]
+
+  @@map("lessons")
+}
+
+model Enrollment {
+  id                String   @id @default(cuid())
+  userId            String
+  courseId          String
+  enrollmentDate    DateTime @default(now())
+  startDate         DateTime?
+  completionDate    DateTime?
+  currentModuleId   String?
+  currentLessonId   String?
+  timeSpent         Int @default(0) // in minutes
+  lastAccessed      DateTime @default(now())
+  status            EnrollmentStatus @default(ENROLLED)
+  progressPercentage Float @default(0.0)
+
+  // Relations
+  user              User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course            Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  moduleProgress    ModuleProgress[]
+  lessonProgress    LessonProgress[]
+
+  @@unique([userId, courseId])
+  @@map("enrollments")
+}
+
+model ModuleProgress {
+  id                String   @id @default(cuid())
+  enrollmentId      String
+  moduleId          String
+  startedAt         DateTime @default(now())
+  completedAt       DateTime?
+  timeSpent         Int @default(0) // in minutes
+  status            ProgressStatus @default(NOT_STARTED)
+
+  // Relations
+  enrollment        Enrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  module            Module @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+
+  @@unique([enrollmentId, moduleId])
+  @@map("module_progress")
+}
+
+model LessonProgress {
+  id                String   @id @default(cuid())
+  enrollmentId      String
+  lessonId          String
+  startedAt         DateTime @default(now())
+  completedAt       DateTime?
+  timeSpent         Int @default(0) // in minutes
+  status            ProgressStatus @default(NOT_STARTED)
+
+  // Relations
+  enrollment        Enrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  lesson            Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@unique([enrollmentId, lessonId])
+  @@map("lesson_progress")
+}
+
+model Assessment {
+  id                String   @id @default(cuid())
+  courseId          String
+  title             String
+  description       String?
+  type              AssessmentType @default(QUIZ)
+  questions         Json // Store questions as JSON
+  passingScore      Int @default(70)
+  maxAttempts       Int @default(3)
+  timeLimit         Int? // in minutes
+  isProctored       Boolean @default(false)
+  availableFrom     DateTime @default(now())
+  availableUntil    DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relations
+  course            Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  results           AssessmentResult[]
+
+  @@map("assessments")
+}
+
+model AssessmentResult {
+  id                String   @id @default(cuid())
+  userId            String
+  assessmentId      String
+  answers           Json // Store answers as JSON
+  score             Int
+  passed            Boolean
+  attemptNumber     Int
+  startedAt         DateTime
+  completedAt       DateTime
+  feedback          Json? // Store detailed feedback as JSON
+
+  // Relations
+  user              User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assessment        Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+
+  @@map("assessment_results")
+}
+
+model Certificate {
+  id                String   @id @default(cuid())
+  userId            String
+  courseId          String
+  credentialId      String @unique
+  issueDate         DateTime @default(now())
+  expirationDate    DateTime?
+  blockchainHash    String?
+  verificationUrl   String
+  status            CertificateStatus @default(ACTIVE)
+  metadata          Json? // Store additional certificate data
+
+  // Relations
+  user              User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course            Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@map("certificates")
+}
+
+model Skill {
+  id                String   @id @default(cuid())
+  name              String   @unique
+  description       String?
+  category          String
+  industryRelevance Json // Store industry tags as JSON
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relations
+  userSkills        UserSkill[]
+  courseSkills      CourseSkill[]
+
+  @@map("skills")
+}
+
+model UserSkill {
+  id                String   @id @default(cuid())
+  userId            String
+  skillId           String
+  level             SkillLevel @default(BEGINNER)
+  confidence        Int @default(0) // 0-100
+  lastPracticed     DateTime @default(now())
+  hoursSpent        Int @default(0)
+  sourceType        SkillSourceType @default(COURSE)
+  verificationStatus VerificationStatus @default(UNVERIFIED)
+
+  // Relations
+  user              User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  skill             Skill @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, skillId])
+  @@map("user_skills")
+}
+
+model CourseSkill {
+  id                String   @id @default(cuid())
+  courseId          String
+  skillId           String
+  targetLevel       SkillLevel @default(BEGINNER)
+  weight            Int @default(1) // Importance weight
+
+  // Relations
+  course            Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  skill             Skill @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@unique([courseId, skillId])
+  @@map("course_skills")
+}
+
+model LearningHistory {
+  id                String   @id @default(cuid())
+  userId            String
+  activityType      ActivityType
+  entityId          String // Course, Module, Lesson, or Assessment ID
+  entityType        EntityType
+  activityData      Json // Store activity-specific data
+  timestamp         DateTime @default(now())
+
+  // Relations
+  user              User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("learning_history")
+}
+
+model CourseReview {
+  id                String   @id @default(cuid())
+  courseId          String
+  userId            String
+  rating            Int // 1-5 stars
+  review            String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relations
+  course            Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([courseId, userId])
+  @@map("course_reviews")
+}
+
+model Job {
+  id                String   @id @default(cuid())
+  title             String
+  companyName       String
+  description       String
+  requirements      Json // Store job requirements as JSON
+  skillsRequired    Json // Store required skills as JSON
+  experienceLevel   ExperienceLevel
+  salaryRange       Json // Store salary information as JSON
+  location          String
+  remoteOptions     Json // Store remote work options as JSON
+  benefits          Json // Store benefits as JSON
+  applicationDeadline DateTime?
+  postedDate        DateTime @default(now())
+  status            JobStatus @default(ACTIVE)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relations
+  applications      JobApplication[]
+
+  @@map("jobs")
+}
+
+model JobApplication {
+  id                String   @id @default(cuid())
+  userId            String
+  jobId             String
+  applicationData   Json // Store application details as JSON
+  status            ApplicationStatus @default(PENDING)
+  appliedAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relations
+  user              User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  job               Job @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, jobId])
+  @@map("job_applications")
+}
+
+// Enums
+enum ExperienceLevel {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+  EXPERT
+}
+
+enum DifficultyLevel {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+}
+
+enum SubscriptionStatus {
+  FREE
+  BASIC
+  PREMIUM
+  ENTERPRISE
+}
+
+enum CourseStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum LessonType {
+  VIDEO
+  TEXT
+  INTERACTIVE
+  QUIZ
+  ASSIGNMENT
+  LIVE_SESSION
+}
+
+enum EnrollmentStatus {
+  ENROLLED
+  IN_PROGRESS
+  COMPLETED
+  DROPPED
+  SUSPENDED
+}
+
+enum ProgressStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum AssessmentType {
+  QUIZ
+  ASSIGNMENT
+  PROJECT
+  PRACTICAL
+  CERTIFICATION
+}
+
+enum CertificateStatus {
+  ACTIVE
+  EXPIRED
+  REVOKED
+}
+
+enum SkillLevel {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+  EXPERT
+}
+
+enum SkillSourceType {
+  COURSE
+  ASSESSMENT
+  PROJECT
+  EXPERIENCE
+  CERTIFICATION
+}
+
+enum VerificationStatus {
+  UNVERIFIED
+  VERIFIED
+  ENDORSED
+}
+
+enum ActivityType {
+  ENROLLMENT
+  MODULE_START
+  MODULE_COMPLETE
+  LESSON_START
+  LESSON_COMPLETE
+  ASSESSMENT_START
+  ASSESSMENT_COMPLETE
+  CERTIFICATE_EARNED
+}
+
+enum EntityType {
+  COURSE
+  MODULE
+  LESSON
+  ASSESSMENT
+}
+
+enum JobStatus {
+  ACTIVE
+  CLOSED
+  DRAFT
+}
+
+enum ApplicationStatus {
+  PENDING
+  REVIEWED
+  INTERVIEW
+  ACCEPTED
+  REJECTED
+}

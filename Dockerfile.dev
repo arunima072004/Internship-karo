@@ -1,0 +1,18 @@
+FROM node:18-alpine
+
+WORKDIR /app
+
+# Install dependencies
+COPY package*.json ./
+COPY packages/*/package*.json ./packages/*/
+RUN npm ci
+
+# Copy source code
+COPY . .
+
+# Build shared package
+RUN npm run build --workspace=@itp/shared
+
+EXPOSE 3000 4000
+
+CMD ["npm", "run", "dev"]
